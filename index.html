@@ -165,6 +165,15 @@ input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{out
 .fonts button{border:1px solid var(--border);background:var(--bg);border-radius:12px;padding:.7rem;text-align:left}
 .fonts button.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .fonts small{display:block;color:var(--muted)}
+.app-row{padding:.65rem 0;border-bottom:1px solid var(--border)}
+.app-row:last-child{border-bottom:0}
+.app-h{display:flex;justify-content:space-between;gap:.8rem;align-items:baseline}
+.app-h b{font-weight:700}
+.app-h span{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+.app-s{color:var(--muted);font-size:.82rem;margin-top:.15rem}
+.meter{height:.45rem;background:var(--bg);border-radius:99px;overflow:hidden;margin-top:.45rem}
+.meter i{display:block;height:100%;border-radius:99px;background:var(--good)}
+.meter i.n{background:var(--bad)}
 .lh{color:var(--muted);font-size:.85rem;padding:0 .2rem}
 .empty{text-align:center;color:var(--muted);padding:2rem 1rem}
 .empty b{display:block;color:var(--text);margin-bottom:.2rem}
@@ -231,6 +240,7 @@ var STORAGES=['8 GB','16 GB','32 GB','64 GB','128 GB','256 GB','512 GB','1 TB'];
 var ACCENTS={blue:['Mavi','#2563eb'],green:['Yeşil','#16a34a'],purple:['Mor','#7c3aed'],orange:['Turuncu','#ea580c'],red:['Kırmızı','#dc2626'],teal:['Turkuaz','#0d9488']};
 var FONTS={system:['Sistem','system-ui,-apple-system,"Segoe UI",Roboto,sans-serif'],serif:['Klasik','Georgia,"Times New Roman",serif'],mono:['Teknik','ui-monospace,SFMono-Regular,Menlo,Consolas,monospace'],rounded:['Yuvarlak','ui-rounded,"SF Pro Rounded","Nunito","Trebuchet MS",sans-serif']};
 var BRANDS=['Apple','Samsung','Xiaomi','Redmi','Poco','Huawei','Honor','Oppo','Realme','Vivo','OnePlus','Google','Motorola','Nokia','Sony','Reeder','General Mobile','Casper','Tecno','Infinix','Lenovo','HP','Dell','Asus','Acer','MSI','Monster','Microsoft','Huawei'];
+var APPS=['Marketplace (Facebook)','Sahibinden.com','Dolap','Gardrops'];
 var MONTHS=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
 var TABS=[
   ['home','Ana sayfa','<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>'],
@@ -271,24 +281,49 @@ function profitOf(i){return i.sold?i.sellPrice-i.buyPrice-i.expense:0}
 function nameOf(i){return i.brand+' '+i.model}
 function sum(a,f){return a.reduce(function(t,x){return t+f(x)},0)}
 
+function pick(o){for(var i=1;i<arguments.length;i++){var v=o[arguments[i]];if(v!==undefined&&v!==null&&v!=='')return v}return ''}
+function fixDate(d){var m=/^(\d{4}-\d{2}-\d{2})/.exec(String(d||''));return m?m[1]:''}
+function fixStorage(v){
+  var t=String(v||'').trim(),m=/^(\d+)\s*(gb|tb)$/i.exec(t);
+  return m?m[1]+' '+m[2].toUpperCase():t.slice(0,10);
+}
+function fixCat(v){
+  var t=String(v||'').trim().toLocaleLowerCase('tr');
+  for(var i=0;i<CATS.length;i++)if(CATS[i].toLocaleLowerCase('tr')===t)return CATS[i];
+  return 'Diğer';
+}
+function fixApp(v){
+  var t=String(v||'').toLocaleLowerCase('tr');if(!t)return '';
+  for(var i=0;i<APPS.length;i++)if(APPS[i].toLocaleLowerCase('tr')===t)return APPS[i];
+  if(t.indexOf('facebook')>-1||t.indexOf('marketplace')>-1)return APPS[0];
+  if(t.indexOf('sahibinden')>-1)return APPS[1];
+  if(t.indexOf('dolap')>-1)return APPS[2];
+  if(t.indexOf('gardrops')>-1)return APPS[3];
+  return '';
+}
+/* Hem bu uygulamanın hem de eski uygulamanın (products, purchasePrice, memory…) alan adlarını okur */
 function normalize(o){
   if(!o||typeof o!=='object')return null;
-  var brand=String(o.brand||'').trim().slice(0,40), model=String(o.model||'').trim().slice(0,60);
+  var brand=String(pick(o,'brand','marka')).trim().slice(0,40), model=String(pick(o,'model')).trim().slice(0,60);
   if(!brand&&!model)return null;
-  var sold=!!o.sold;
+  var status=String(pick(o,'status','durum')).toLocaleLowerCase('tr');
+  var sold=o.sold===true||status==='satıldı'||status==='satildi'||status==='sold';
+  var photo=pick(o,'photo','image');
   return {
-    id:String(o.id||uid()),
-    cat:CATS.indexOf(o.cat)>-1?o.cat:'Diğer',
+    id:String(pick(o,'id')||uid()),
+    cat:fixCat(pick(o,'cat','category')),
     brand:brand,model:model,
-    storage:String(o.storage||'').trim().slice(0,10),
-    buyPrice:Math.max(0,num(o.buyPrice)),
-    expense:Math.max(0,num(o.expense)),
-    buyDate:validDate(o.buyDate)||today(),
-    note:String(o.note||'').slice(0,500),
-    photo:(typeof o.photo==='string'&&o.photo.indexOf('data:image/')===0&&o.photo.length<400000)?o.photo:'',
+    storage:fixStorage(pick(o,'storage','memory')),
+    buyPrice:Math.max(0,num(pick(o,'buyPrice','purchasePrice'))),
+    expense:Math.max(0,num(pick(o,'expense','expenses'))),
+    buyDate:fixDate(pick(o,'buyDate','purchaseDate'))||today(),
+    note:String(pick(o,'note','notes')).slice(0,500),
+    photo:(typeof photo==='string'&&photo.indexOf('data:image/')===0&&photo.length<600000)?photo:'',
+    buyApp:fixApp(pick(o,'buyApp','boughtFrom')),
+    sellApp:sold?fixApp(pick(o,'sellApp','soldOn')):'',
     sold:sold,
-    sellPrice:sold?Math.max(0,num(o.sellPrice)):0,
-    sellDate:sold?(validDate(o.sellDate)||today()):'',
+    sellPrice:sold?Math.max(0,num(pick(o,'sellPrice','salePrice'))):0,
+    sellDate:sold?(fixDate(pick(o,'sellDate','saleDate'))||today()):'',
     createdAt:Number(o.createdAt)||Date.now()
   };
 }
@@ -296,10 +331,10 @@ function normalize(o){
 /* ---------- Durum ---------- */
 var items=(function(){var a=store.get(KEY_ITEMS,[]);return Array.isArray(a)?a.map(normalize).filter(Boolean):[]})();
 var settings=Object.assign({theme:'auto',accent:'blue',font:'system',size:100},store.get(KEY_SET,{}));
-var open=new Set(['home-ozet','stats-alis','stats-satis','oz-genel','st-gorunum']);
+var open=new Set(['home-ozet','stats-alis','stats-satis','oz-genel','oz-app','st-gorunum']);
 var F={
-  alis:{cat:'',q:'',storage:'',status:'',month:'',sort:'new'},
-  satis:{cat:'',q:'',storage:'',month:'',sort:'new'},
+  alis:{cat:'',q:'',storage:'',status:'',month:'',app:'',sort:'new'},
+  satis:{cat:'',q:'',storage:'',month:'',app:'',sort:'new'},
   ozet:{cat:'',month:''}
 };
 var cur={tab:'home',refresh:null};
@@ -384,11 +419,26 @@ function monthSelect(list,keys,tab){
   return '<option value="">Tüm aylar</option>'+m.map(function(x){return '<option value="'+x+'"'+(x===f.month?' selected':'')+'>'+monthLabel(x)+'</option>'}).join('');
 }
 function cmp(key){return function(a,b){return (b[key]||'').localeCompare(a[key]||'')||b.createdAt-a.createdAt}}
+function appStats(list,key){
+  var out=[];
+  APPS.concat(['']).forEach(function(g){
+    var l=list.filter(function(i){return (i[key]||'')===g});
+    if(!l.length)return;
+    var sold=l.filter(function(i){return i.sold});
+    var cost=sum(sold,function(i){return i.buyPrice+i.expense}),rev=sum(sold,function(i){return i.sellPrice});
+    out.push({name:g||'Belirtilmedi',named:!!g,count:l.length,sold:sold.length,stock:l.length-sold.length,
+      buyTotal:sum(l,function(i){return i.buyPrice}),sellTotal:rev,cost:cost,profit:rev-cost,
+      avg:sold.length?(rev-cost)/sold.length:0,margin:cost?(rev-cost)/cost*100:0});
+  });
+  return out;
+}
 function applyList(list,f,tab){
   var q=(f.q||'').trim().toLocaleLowerCase('tr');
   var out=list.filter(function(i){
     if(q&&(i.brand+' '+i.model+' '+i.storage+' '+i.note).toLocaleLowerCase('tr').indexOf(q)<0)return false;
     if(f.storage&&i.storage!==f.storage)return false;
+    if(f.app){var ak=tab==='alis'?'buyApp':'sellApp';
+      if(f.app==='__none'){if(i[ak])return false}else if(i[ak]!==f.app)return false}
     if(f.status==='stock'&&i.sold)return false;
     if(f.status==='sold'&&!i.sold)return false;
     return true;
@@ -402,7 +452,7 @@ function applyList(list,f,tab){
   else if(s==='loss')out.sort(function(a,b){return profitOf(a)-profitOf(b)});
   return out;
 }
-function activeFilters(f){return ['q','storage','status','month'].filter(function(k){return f[k]}).length}
+function activeFilters(f){return ['q','storage','status','month','app'].filter(function(k){return f[k]}).length}
 
 /* ---------- Kartlar ---------- */
 function icoOf(i){return i.photo?'<span class="ico ph"><img src="'+esc(i.photo)+'" alt="" loading="lazy"></span>':'<span class="ico">'+svg(ICONS[i.cat]||ICONS['Diğer'])+'</span>'}
@@ -412,9 +462,9 @@ function metaOf(i){return [i.cat,i.storage].filter(Boolean).join(' · ')}
 function cardAlis(i){
   var head=icoOf(i)+'<span class="tt"><b>'+esc(nameOf(i))+'</b><small>'+esc(metaOf(i))+' · '+fmtDate(i.buyDate)+'</small></span>'+
     '<span class="rt"><b>'+fmt(i.buyPrice)+'</b><span class="badge '+(i.sold?'sold':'stock')+'">'+(i.sold?'Satıldı':'Stokta')+'</span></span>';
-  var body=bigPhoto(i)+kv('Sınıf',esc(i.cat))+kv('Hafıza',esc(i.storage||'—'))+kv('Alış tarihi',fmtDate(i.buyDate))+
+  var body=bigPhoto(i)+kv('Sınıf',esc(i.cat))+kv('Hafıza',esc(i.storage||'—'))+kv('Alış tarihi',fmtDate(i.buyDate))+kv('Alındığı yer',esc(i.buyApp||'—'))+
     kv('Alış fiyatı',fmt(i.buyPrice))+kv('Masraf',fmt(i.expense))+kv('Toplam maliyet',fmt(i.buyPrice+i.expense));
-  if(i.sold)body+=kv('Satış fiyatı',fmt(i.sellPrice))+kv('Satış tarihi',fmtDate(i.sellDate))+kv('Kâr / zarar',fmtS(profitOf(i)),cls(profitOf(i)));
+  if(i.sold)body+=kv('Satış fiyatı',fmt(i.sellPrice))+kv('Satış tarihi',fmtDate(i.sellDate))+kv('Satıldığı yer',esc(i.sellApp||'—'))+kv('Kâr / zarar',fmtS(profitOf(i)),cls(profitOf(i)));
   if(i.note)body+=kv('Not',esc(i.note));
   body+='<div class="acts"><button class="btn sm" data-a="edit-buy" data-id="'+i.id+'">Düzenle</button>'+
     (i.sold?'':'<button class="btn sm primary" data-a="sell" data-id="'+i.id+'">Sat</button>')+
@@ -425,7 +475,7 @@ function cardSatis(i){
   var p=profitOf(i);
   var head=icoOf(i)+'<span class="tt"><b>'+esc(nameOf(i))+'</b><small>'+esc(metaOf(i))+' · '+fmtDate(i.sellDate)+'</small></span>'+
     '<span class="rt"><b>'+fmt(i.sellPrice)+'</b><span class="badge '+(p<0?'loss':'sold')+'">'+fmtS(p)+'</span></span>';
-  var body=bigPhoto(i)+kv('Sınıf',esc(i.cat))+kv('Hafıza',esc(i.storage||'—'))+kv('Alış tarihi',fmtDate(i.buyDate))+kv('Satış tarihi',fmtDate(i.sellDate))+
+  var body=bigPhoto(i)+kv('Sınıf',esc(i.cat))+kv('Hafıza',esc(i.storage||'—'))+kv('Alış tarihi',fmtDate(i.buyDate))+kv('Satış tarihi',fmtDate(i.sellDate))+kv('Alındığı yer',esc(i.buyApp||'—'))+kv('Satıldığı yer',esc(i.sellApp||'—'))+
     kv('Alış fiyatı',fmt(i.buyPrice))+kv('Masraf',fmt(i.expense))+kv('Satış fiyatı',fmt(i.sellPrice))+kv('Kâr / zarar',fmtS(p),cls(p));
   if(i.note)body+=kv('Not',esc(i.note));
   body+='<div class="acts"><button class="btn sm" data-a="edit-sale" data-id="'+i.id+'">Düzenle</button>'+
@@ -441,19 +491,24 @@ function chipsHtml(tab,pool){
     return '<button class="chip'+(F[tab].cat===c?' on':'')+'" data-a="chip" data-tab="'+tab+'" data-v="'+c+'">'+(c||'Tümü')+'<i>'+n+'</i></button>';
   }).join('');
 }
+function appOpts(sel){return '<option value="">Belirtilmedi</option>'+APPS.map(function(x){return '<option value="'+esc(x)+'"'+(x===sel?' selected':'')+'>'+esc(x)+'</option>'}).join('')}
+function appFilterOpts(sel){
+  return '<option value="">Tümü</option>'+APPS.map(function(x){return '<option value="'+esc(x)+'"'+(x===sel?' selected':'')+'>'+esc(x)+'</option>'}).join('')+
+    '<option value="__none"'+(sel==='__none'?' selected':'')+'>Belirtilmedi</option>';
+}
 function filterBody(tab){
   var f=F[tab];
+  var sortOpts=(tab==='alis'
+    ?[['new','En yeni'],['old','En eski'],['high','Fiyat: yüksek'],['low','Fiyat: düşük']]
+    :[['new','En yeni'],['old','En eski'],['profit','Kâr: yüksek'],['loss','Kâr: düşük'],['high','Fiyat: yüksek']])
+    .map(function(o){return '<option value="'+o[0]+'"'+(f.sort===o[0]?' selected':'')+'>'+o[1]+'</option>'}).join('');
   return '<div class="fld"><label>Ara</label><input type="search" placeholder="Marka, model, not…" data-f="q" data-tab="'+tab+'" value="'+esc(f.q)+'"></div>'+
+    '<div class="fld"><label>'+(tab==='alis'?'Alındığı uygulama':'Satıldığı uygulama')+'</label><select data-f="app" data-tab="'+tab+'">'+appFilterOpts(f.app)+'</select></div>'+
     '<div class="row2"><div class="fld"><label>Hafıza</label><select data-f="storage" data-tab="'+tab+'">'+opts(STORAGES,f.storage,'Tümü')+'</select></div>'+
     '<div class="fld"><label>Ay</label><select data-f="month" data-tab="'+tab+'" id="f-month"></select></div></div>'+
     '<div class="row2">'+
-    (tab==='alis'?'<div class="fld"><label>Durum</label><select data-f="status" data-tab="alis"><option value="">Tümü</option><option value="stock"'+(f.status==='stock'?' selected':'')+'>Stokta</option><option value="sold"'+(f.status==='sold'?' selected':'')+'>Satıldı</option></select></div>':'<div></div>')+
-    '<div class="fld"><label>Sırala</label><select data-f="sort" data-tab="'+tab+'">'+
-      (tab==='alis'
-        ?[['new','En yeni'],['old','En eski'],['high','Fiyat: yüksek'],['low','Fiyat: düşük']]
-        :[['new','En yeni'],['old','En eski'],['profit','Kâr: yüksek'],['loss','Kâr: düşük'],['high','Fiyat: yüksek']])
-        .map(function(o){return '<option value="'+o[0]+'"'+(f.sort===o[0]?' selected':'')+'>'+o[1]+'</option>'}).join('')+
-    '</select></div></div>'+
+    (tab==='alis'?'<div class="fld"><label>Durum</label><select data-f="status" data-tab="alis"><option value="">Tümü</option><option value="stock"'+(f.status==='stock'?' selected':'')+'>Stokta</option><option value="sold"'+(f.status==='sold'?' selected':'')+'>Satıldı</option></select></div>':'')+
+    '<div class="fld"><label>Sırala</label><select data-f="sort" data-tab="'+tab+'">'+sortOpts+'</select></div></div>'+
     '<button class="btn sm" data-a="clear-f" data-tab="'+tab+'">Filtreleri temizle</button>';
 }
 
@@ -575,9 +630,25 @@ function refreshOzet(){
   var mx=Math.max.apply(null,vals.map(Math.abs).concat([1]));
   var bars='<div class="bars">'+mo.map(function(m,i){
     return '<div class="bar"><span>'+MONTHS[+m.slice(5)-1].slice(0,3)+' '+m.slice(2,4)+'</span><span class="tr"><span class="fl'+(vals[i]<0?' n':'')+'" style="display:block;width:'+Math.round(Math.abs(vals[i])/mx*100)+'%"></span></span><span class="'+cls(vals[i])+'">'+fmtS(vals[i]).replace(' TL','')+'</span></div>'}).join('')+'</div>';
+  var aS=appStats(s.sells,'sellApp').sort(function(a,b){return b.profit-a.profit});
+  var mxA=Math.max.apply(null,aS.map(function(r){return Math.abs(r.profit)}).concat([1]));
+  var named=aS.filter(function(r){return r.named});
+  var appSat=aS.length?(named.length?'<div class="lh" style="padding:0 0 .3rem">En kârlı uygulama: <b style="color:var(--text)">'+esc(named[0].name)+'</b> ('+fmtS(named[0].profit)+')</div>':'')+
+    aS.map(function(r){return '<div class="app-row"><div class="app-h"><b>'+esc(r.name)+'</b><span class="'+cls(r.profit)+'">'+fmtS(r.profit)+'</span></div>'+
+      '<div class="app-s">'+r.count+' satış · Ciro '+fmt(r.sellTotal)+' · Ort. kâr '+fmtS(r.avg)+' · Marj %'+(Math.round(r.margin*10)/10).toLocaleString('tr-TR')+'</div>'+
+      '<div class="meter"><i class="'+(r.profit<0?'n':'')+'" style="width:'+Math.round(Math.abs(r.profit)/mxA*100)+'%"></i></div></div>'}).join('')
+    :empty('Satış verisi yok','Satış eklerken "Satıldığı yer" seçin.');
+  var aB=appStats(s.buys,'buyApp').sort(function(a,b){return b.count-a.count});
+  var mxB=Math.max.apply(null,aB.map(function(r){return r.count}).concat([1]));
+  var appAlis=aB.length?aB.map(function(r){return '<div class="app-row"><div class="app-h"><b>'+esc(r.name)+'</b><span>'+fmt(r.buyTotal)+'</span></div>'+
+      '<div class="app-s">'+r.count+' alış · '+r.sold+' satıldı · '+r.stock+' stokta</div>'+
+      '<div class="meter"><i style="background:var(--accent);width:'+Math.round(r.count/mxB*100)+'%"></i></div></div>'}).join('')
+    :empty('Alış verisi yok','Alış eklerken "Alındığı yer" seçin.');
   $('#oz').innerHTML=
     acc('oz-genel',sec('Genel durum'),genel)+
     acc('oz-satis',sec('Satış performansı'),sat)+
+    acc('oz-app',sec('Uygulamaya göre satış analizi'),appSat)+
+    acc('oz-appbuy',sec('Uygulamaya göre alışlar'),appAlis)+
     acc('oz-cat',sec('Sınıfa göre dağılım'),tbl)+
     acc('oz-ay',sec('Aylık kâr (son 6 ay)'),bars);
   $('#oz').style.cssText='display:flex;flex-direction:column;gap:.75rem';
@@ -598,7 +669,7 @@ function viewAyar(){
     '<button class="btn block" data-a="exp-xlsx">Excel (.xlsx) olarak dışa aktar</button>'+
     '<button class="btn block danger" data-a="wipe">Tüm verileri sil</button></div>'+
     '<p class="muted" style="font-size:.82rem;margin:.8rem 0 0">Veriler yalnızca bu cihazın tarayıcısında saklanır. Düzenli olarak JSON yedeği almanız önerilir. Şu an '+items.length+' kayıt var.</p>';
-  var h='<div class="about"><b>Alış Satış Takip</b><br>Oluşturan: <b>HAKAN KORKMAZ</b><br>Copyright © 2026 · Sürüm 1.1</div>';
+  var h='<div class="about"><b>Alış Satış Takip</b><br>Oluşturan: <b>HAKAN KORKMAZ</b><br>Copyright © 2026 · Sürüm 1.3</div>';
   view.innerHTML=acc('st-gorunum',sec('Görünüm'),g)+acc('st-veri',sec('Veri yönetimi'),d)+acc('st-hakkinda',sec('Hakkında'),h);
   view.style.cssText='';
   cur.refresh=null;
@@ -608,6 +679,20 @@ function viewAyar(){
 function brandList(){
   var s={};BRANDS.forEach(function(b){s[b]=1});items.forEach(function(i){if(i.brand)s[i.brand]=1});
   return Object.keys(s).sort();
+}
+function shrinkPhoto(src){
+  return new Promise(function(res,rej){
+    var img=new Image();
+    img.onload=function(){
+      var m=480,w=img.naturalWidth,h=img.naturalHeight,k=Math.min(1,m/Math.max(w,h));
+      w=Math.max(1,Math.round(w*k));h=Math.max(1,Math.round(h*k));
+      var c=document.createElement('canvas');c.width=w;c.height=h;
+      var x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,w,h);x.drawImage(img,0,0,w,h);
+      var out=c.toDataURL('image/jpeg',0.7);res(out.length<src.length?out:src);
+    };
+    img.onerror=function(){rej(new Error('img'))};
+    img.src=src;
+  });
 }
 function readPhoto(file){
   return new Promise(function(res,rej){
@@ -633,6 +718,8 @@ function openBuyForm(id){
     '<div class="row2"><div class="fld"><label>Marka</label><input id="bBrand" list="brands" autocomplete="off" value="'+esc(d.brand)+'" placeholder="Örn. Apple"><datalist id="brands">'+brandList().map(function(b){return '<option value="'+esc(b)+'">'}).join('')+'</datalist></div>'+
     '<div class="fld"><label>Model</label><input id="bModel" autocomplete="off" value="'+esc(d.model)+'" placeholder="Örn. iPhone 13"></div></div>'+
     '<div class="fld"><label>Hafıza</label><select id="bStorage">'+opts(STORAGES,d.storage,'Belirtilmedi')+'</select></div>'+
+    '<div class="fld"><label>Alındığı yer</label><select id="bApp">'+appOpts(d.buyApp)+'</select></div>'+
+    (it&&it.sold?'<div class="fld"><label>Satıldığı yer</label><select id="bSellApp">'+appOpts(d.sellApp)+'</select></div>':'')+
     '<div class="row2"><div class="fld"><label>Alış fiyatı (TL)</label><input id="bPrice" type="number" step="any" min="0" inputmode="decimal" value="'+esc(d.buyPrice)+'"></div>'+
     '<div class="fld"><label>Masraf (TL)</label><input id="bExp" type="number" step="any" min="0" inputmode="decimal" value="'+esc(d.expense)+'"></div></div>'+
     '<div class="fld"><label>Alış tarihi</label><input id="bDate" type="date" value="'+esc(d.buyDate)+'"></div>'+
@@ -655,6 +742,8 @@ function openBuyForm(id){
     if(price===''||num(price)<0)return err('Alış fiyatını girin.');
     if(num($('#bExp').value)<0)return err('Masraf negatif olamaz.');
     var data={cat:cat,brand:brand,model:model,storage:$('#bStorage').value,buyPrice:num(price),expense:Math.max(0,num($('#bExp').value)),buyDate:validDate($('#bDate').value)||today(),note:$('#bNote').value.trim(),photo:photo};
+    data.buyApp=$('#bApp').value;
+    if(it&&it.sold&&$('#bSellApp'))it.sellApp=$('#bSellApp').value;
     if(it){Object.assign(it,data)}
     else{items.push(Object.assign({id:uid(),sold:false,sellPrice:0,sellDate:'',createdAt:Date.now()},data))}
     saveItems();closeSheet();render();toast(it?'Alış güncellendi':'Alış eklendi');
@@ -677,6 +766,7 @@ function openSaleForm(id){
     '<div class="row2"><div class="fld"><label>Satış fiyatı (TL)</label><input id="sPrice" type="number" step="any" min="0" inputmode="decimal" value="'+(editing?esc(it.sellPrice):'')+'"></div>'+
     '<div class="fld"><label>Masraf (TL)</label><input id="sExp" type="number" step="any" min="0" inputmode="decimal" value="'+esc(first.expense||'')+'"></div></div>'+
     '<div class="fld"><label>Satış tarihi</label><input id="sDate" type="date" value="'+esc(editing?it.sellDate:today())+'"></div>'+
+    '<div class="fld"><label>Satıldığı yer</label><select id="sApp">'+appOpts(editing?it.sellApp:'')+'</select></div>'+
     '<div class="prev" id="prev"></div><div class="err" id="err"></div>'+
     '<div class="btns"><button class="btn" data-a="close">Vazgeç</button><button class="btn primary" id="sSave">Kaydet</button></div>');
   var curItem=function(){return editing?it:items.find(function(x){return x.id===$('#sItem').value})};
@@ -689,7 +779,7 @@ function openSaleForm(id){
   $('#sSave').onclick=function(){
     var c=curItem(),price=$('#sPrice').value;
     if(price===''||num(price)<0){$('#err').textContent='Satış fiyatını girin.';return}
-    c.sold=true;c.sellPrice=num(price);c.expense=Math.max(0,num($('#sExp').value));c.sellDate=validDate($('#sDate').value)||today();
+    c.sold=true;c.sellPrice=num(price);c.expense=Math.max(0,num($('#sExp').value));c.sellDate=validDate($('#sDate').value)||today();c.sellApp=$('#sApp').value;
     saveItems();closeSheet();render();toast(editing?'Satış güncellendi':'Satış kaydedildi');
   };
 }
@@ -702,7 +792,7 @@ async function delItem(id){
 async function unsell(id){
   var it=items.find(function(x){return x.id===id});if(!it)return;
   var r=await ask('Stoğa geri alınsın mı?',esc(nameOf(it))+' satış kayıtlarından çıkıp tekrar stokta görünecek.',[{label:'Vazgeç',value:false},{label:'Geri al',value:true,cls:'primary'}]);
-  if(r){it.sold=false;it.sellPrice=0;it.sellDate='';saveItems();render();toast('Stoğa geri alındı')}
+  if(r){it.sold=false;it.sellPrice=0;it.sellDate='';it.sellApp='';saveItems();render();toast('Stoğa geri alındı')}
 }
 
 /* ---------- Dışa / İçe aktarma ---------- */
@@ -718,10 +808,12 @@ function exportJSON(){
 async function importJSON(file){
   try{
     var data=JSON.parse(await file.text());
-    var arr=Array.isArray(data)?data:data&&data.items;
+    var arr=Array.isArray(data)?data:data&&(data.items||data.products);
     if(!Array.isArray(arr))throw new Error('format');
     var clean=arr.map(normalize).filter(Boolean);
     if(!clean.length){toast('Dosyada geçerli kayıt bulunamadı');return}
+    toast('Kayıtlar okunuyor…');
+    for(var n=0;n<clean.length;n++){if(clean[n].photo.length>70000){try{clean[n].photo=await shrinkPhoto(clean[n].photo)}catch(e){}}}
     var ch=await ask('İçe aktarma',clean.length+' kayıt bulundu. Cihazda '+items.length+' kayıt var. Nasıl devam edilsin?',
       [{label:'Birleştir',value:'merge',cls:'primary'},{label:'Mevcutları değiştir',value:'replace'},{label:'Vazgeç',value:null}]);
     if(!ch)return;
@@ -759,26 +851,30 @@ async function exportXLSX(){
     ['Toplam alış tutarı (TL)',s.buyTotal],['Toplam satış tutarı (TL)',s.sellTotal],['Toplam masraf (TL)',sum(items,function(i){return i.expense})],
     ['Stok tutarı (TL)',s.stockValue],['Net kâr / zarar (TL)',s.profit],[],['Sınıf','Alış','Satış','Stok','Kâr (TL)']];
   CATS.forEach(function(c){var x=summary(c,'');ozet.push([c,x.buyCount,x.sellCount,x.stockCount,x.profit])});
+  ozet.push([]);ozet.push(['Uygulama (satış)','Satış adedi','Satış tutarı (TL)','Kâr (TL)','Ort. kâr (TL)']);
+  appStats(s.sells,'sellApp').sort(function(a,b){return b.profit-a.profit}).forEach(function(r){ozet.push([r.name,r.count,r.sellTotal,r.profit,r.avg])});
+  ozet.push([]);ozet.push(['Uygulama (alış)','Alış adedi','Alış tutarı (TL)','Satılan','Stokta']);
+  appStats(s.buys,'buyApp').sort(function(a,b){return b.count-a.count}).forEach(function(r){ozet.push([r.name,r.count,r.buyTotal,r.sold,r.stock])});
   var add=function(name,aoa,w){var ws=X.utils.aoa_to_sheet(aoa);ws['!cols']=w.map(function(n){return {wch:n}});X.utils.book_append_sheet(wb,ws,name)};
-  add('Özet',ozet,[26,14,12,10,14]);
+  add('Özet',ozet,[26,16,18,14,14]);
   var sorted=items.slice().sort(cmp('buyDate'));
-  add('Alışlar',[['Sınıf','Marka','Model','Hafıza','Alış tarihi','Alış fiyatı (TL)','Masraf (TL)','Durum','Not']].concat(
-    sorted.map(function(i){return [i.cat,i.brand,i.model,i.storage,i.buyDate,i.buyPrice,i.expense,i.sold?'Satıldı':'Stokta',i.note]})),[10,14,20,10,12,16,12,10,30]);
+  add('Alışlar',[['Sınıf','Marka','Model','Hafıza','Alış tarihi','Alış fiyatı (TL)','Masraf (TL)','Durum','Alındığı yer','Satıldığı yer','Not']].concat(
+    sorted.map(function(i){return [i.cat,i.brand,i.model,i.storage,i.buyDate,i.buyPrice,i.expense,i.sold?'Satıldı':'Stokta',i.buyApp,i.sellApp,i.note]})),[10,14,20,10,12,16,12,10,22,22,30]);
   var sl=items.filter(function(i){return i.sold}).sort(cmp('sellDate'));
-  var srows=sl.map(function(i){return [i.cat,i.brand,i.model,i.storage,i.buyDate,i.sellDate,i.buyPrice,i.expense,i.sellPrice,profitOf(i)]});
+  var srows=sl.map(function(i){return [i.cat,i.brand,i.model,i.storage,i.buyDate,i.sellDate,i.buyPrice,i.expense,i.sellPrice,profitOf(i),i.buyApp,i.sellApp]});
   srows.push(['TOPLAM','','','','','',sum(sl,function(i){return i.buyPrice}),sum(sl,function(i){return i.expense}),sum(sl,function(i){return i.sellPrice}),sum(sl,profitOf)]);
-  add('Satışlar',[['Sınıf','Marka','Model','Hafıza','Alış tarihi','Satış tarihi','Alış fiyatı (TL)','Masraf (TL)','Satış fiyatı (TL)','Kâr / zarar (TL)']].concat(srows),[10,14,20,10,12,12,16,12,16,16]);
+  add('Satışlar',[['Sınıf','Marka','Model','Hafıza','Alış tarihi','Satış tarihi','Alış fiyatı (TL)','Masraf (TL)','Satış fiyatı (TL)','Kâr / zarar (TL)','Alındığı yer','Satıldığı yer']].concat(srows),[10,14,20,10,12,12,16,12,16,16,22,22]);
   var st=items.filter(function(i){return !i.sold}).sort(cmp('buyDate'));
-  var strows=st.map(function(i){return [i.cat,i.brand,i.model,i.storage,i.buyDate,i.buyPrice,i.expense,i.buyPrice+i.expense]});
+  var strows=st.map(function(i){return [i.cat,i.brand,i.model,i.storage,i.buyDate,i.buyPrice,i.expense,i.buyPrice+i.expense,i.buyApp]});
   strows.push(['TOPLAM','','','','',sum(st,function(i){return i.buyPrice}),sum(st,function(i){return i.expense}),sum(st,function(i){return i.buyPrice+i.expense})]);
-  add('Stok',[['Sınıf','Marka','Model','Hafıza','Alış tarihi','Alış fiyatı (TL)','Masraf (TL)','Maliyet (TL)']].concat(strows),[10,14,20,10,12,16,12,14]);
+  add('Stok',[['Sınıf','Marka','Model','Hafıza','Alış tarihi','Alış fiyatı (TL)','Masraf (TL)','Maliyet (TL)','Alındığı yer']].concat(strows),[10,14,20,10,12,16,12,14,22]);
   X.writeFile(wb,'alis-satis-'+today()+'.xlsx');
   toast('Excel dosyası indirildi');
 }
 function exportCSV(){
   var q=function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'};
-  var rows=[['Sınıf','Marka','Model','Hafıza','Alış tarihi','Alış fiyatı','Masraf','Durum','Satış tarihi','Satış fiyatı','Kâr/Zarar']].concat(
-    items.map(function(i){return [i.cat,i.brand,i.model,i.storage,i.buyDate,i.buyPrice,i.expense,i.sold?'Satıldı':'Stokta',i.sellDate,i.sellPrice,profitOf(i)]}));
+  var rows=[['Sınıf','Marka','Model','Hafıza','Alış tarihi','Alış fiyatı','Masraf','Durum','Satış tarihi','Satış fiyatı','Kâr/Zarar','Alındığı yer','Satıldığı yer']].concat(
+    items.map(function(i){return [i.cat,i.brand,i.model,i.storage,i.buyDate,i.buyPrice,i.expense,i.sold?'Satıldı':'Stokta',i.sellDate,i.sellPrice,profitOf(i),i.buyApp,i.sellApp]}));
   download('alis-satis-'+today()+'.csv',new Blob(['\ufeff'+rows.map(function(r){return r.map(q).join(';')}).join('\n')],{type:'text/csv;charset=utf-8'}));
   toast('Excel kütüphanesi yüklenemedi. Bunun yerine CSV indirildi.');
 }
@@ -824,7 +920,7 @@ document.addEventListener('click',function(e){
       if(ph&&ph.photo){var dl=$('#dlg');dl.innerHTML='<div class="dlg-box" style="padding:.5rem;max-width:520px"><img class="lightbox" src="'+esc(ph.photo)+'" alt=""></div>';dl.classList.add('show');dl.onclick=function(){dl.classList.remove('show')}}
       break}
     case 'chip':F[t.dataset.tab].cat=t.dataset.v;if(cur.refresh)cur.refresh();break;
-    case 'clear-f':{var f=F[t.dataset.tab];f.q='';f.storage='';f.status='';f.month='';f.sort='new';
+    case 'clear-f':{var f=F[t.dataset.tab];f.q='';f.storage='';f.status='';f.month='';f.app='';f.sort='new';
       view.querySelectorAll('[data-f]').forEach(function(el){el.value=el.dataset.f==='sort'?'new':''});
       if(cur.refresh)cur.refresh();break}
     case 'set':settings[t.dataset.k]=t.dataset.k==='size'?+t.dataset.v:t.dataset.v;saveSettings();applyTheme();render();break;
