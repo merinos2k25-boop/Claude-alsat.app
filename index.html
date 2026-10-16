@@ -44,6 +44,8 @@
 [data-accent=orange]{--accent:#ea580c}
 [data-accent=red]{--accent:#dc2626}
 [data-accent=teal]{--accent:#0d9488}
+[data-accent=yellow]{--accent:#eab308;--on-accent:#1c1917}
+[data-theme=light][data-accent=yellow]{--accent-text:#a16207}
 [data-theme=light][data-accent=green]{--accent-text:#15803d}
 [data-theme=light][data-accent=orange]{--accent-text:#c2410c}
 [data-theme=light][data-accent=teal]{--accent-text:#0f766e}
@@ -52,7 +54,9 @@
 [data-font=rounded]{--font:ui-rounded,"SF Pro Rounded","Nunito","Trebuchet MS","Segoe UI",sans-serif}
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html{-webkit-text-size-adjust:100%}
+html{-webkit-text-size-adjust:100%;touch-action:manipulation}
+body,button,a,input,select,textarea,label{touch-action:manipulation}
+button,.nav a,.chip,.acc-h,.seg button{-webkit-user-select:none;user-select:none}
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);font-size:1rem;line-height:1.4;min-height:100vh}
 button{font:inherit;color:inherit;cursor:pointer}
 svg{display:block}
@@ -165,6 +169,11 @@ input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{out
 .fonts button{border:1px solid var(--border);background:var(--bg);border-radius:12px;padding:.7rem;text-align:left}
 .fonts button.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .fonts small{display:block;color:var(--muted)}
+.acc.sub{background:var(--bg);box-shadow:none}
+.acc.sub+.acc.sub{margin-top:.5rem}
+.acc.sub .acc-h{min-height:3rem}
+.acc.sub .stat{background:var(--card)}
+.delta{font-size:.82rem;color:var(--muted);margin:.5rem 0 .2rem}
 .app-row{padding:.65rem 0;border-bottom:1px solid var(--border)}
 .app-row:last-child{border-bottom:0}
 .app-h{display:flex;justify-content:space-between;gap:.8rem;align-items:baseline}
@@ -237,7 +246,7 @@ input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{out
 var KEY_ITEMS='asTakip.items.v1', KEY_SET='asTakip.settings.v1';
 var CATS=['Telefon','Tablet','Laptop','Diğer'];
 var STORAGES=['8 GB','16 GB','32 GB','64 GB','128 GB','256 GB','512 GB','1 TB'];
-var ACCENTS={blue:['Mavi','#2563eb'],green:['Yeşil','#16a34a'],purple:['Mor','#7c3aed'],orange:['Turuncu','#ea580c'],red:['Kırmızı','#dc2626'],teal:['Turkuaz','#0d9488']};
+var ACCENTS={blue:['Mavi','#2563eb'],green:['Yeşil','#16a34a'],purple:['Mor','#7c3aed'],orange:['Turuncu','#ea580c'],red:['Kırmızı','#dc2626'],teal:['Turkuaz','#0d9488'],yellow:['Sarı','#eab308']};
 var FONTS={system:['Sistem','system-ui,-apple-system,"Segoe UI",Roboto,sans-serif'],serif:['Klasik','Georgia,"Times New Roman",serif'],mono:['Teknik','ui-monospace,SFMono-Regular,Menlo,Consolas,monospace'],rounded:['Yuvarlak','ui-rounded,"SF Pro Rounded","Nunito","Trebuchet MS",sans-serif']};
 var BRANDS=['Apple','Samsung','Xiaomi','Redmi','Poco','Huawei','Honor','Oppo','Realme','Vivo','OnePlus','Google','Motorola','Nokia','Sony','Reeder','General Mobile','Casper','Tecno','Infinix','Lenovo','HP','Dell','Asus','Acer','MSI','Monster','Microsoft','Huawei'];
 var APPS=['Marketplace (Facebook)','Sahibinden.com','Dolap','Gardrops'];
@@ -331,7 +340,7 @@ function normalize(o){
 /* ---------- Durum ---------- */
 var items=(function(){var a=store.get(KEY_ITEMS,[]);return Array.isArray(a)?a.map(normalize).filter(Boolean):[]})();
 var settings=Object.assign({theme:'auto',accent:'blue',font:'system',size:100},store.get(KEY_SET,{}));
-var open=new Set(['home-ozet','stats-alis','stats-satis','oz-genel','oz-app','st-gorunum']);
+var open=new Set(['home-aylik','mo-'+new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,7),'home-ozet','stats-alis','stats-satis','oz-genel','oz-app','st-gorunum']);
 var F={
   alis:{cat:'',q:'',storage:'',status:'',month:'',app:'',sort:'new'},
   satis:{cat:'',q:'',storage:'',month:'',app:'',sort:'new'},
@@ -513,6 +522,31 @@ function filterBody(tab){
 }
 
 /* ---------- Görünümler ---------- */
+function monthlyHome(){
+  var cm=today().slice(0,7);
+  var ms=monthsOf(items.filter(function(i){return i.sold}),['sellDate']);
+  if(ms.indexOf(cm)<0)ms.push(cm);
+  ms.sort().reverse();
+  var cur=summary('',cm);
+  var body=ms.map(function(m){
+    var x=summary('',m),y=+m.slice(0,4),mo=+m.slice(5);
+    var pd=new Date(y,mo-2,1),pk=pd.getFullYear()+'-'+String(pd.getMonth()+1).padStart(2,'0'),px=summary('',pk);
+    var head='<span class="tt"><b>'+monthLabel(m)+'</b><small>'+x.sellCount+' satış · Ciro '+fmt(x.sellTotal)+'</small></span>'+
+      '<span class="rt"><b class="'+cls(x.profit)+'">'+(x.sellCount?fmtS(x.profit):'—')+'</b></span>';
+    var list=x.sells.slice().sort(cmp('sellDate')).map(function(i){
+      var pr=profitOf(i);
+      return '<div class="mini">'+icoOf(i)+'<span class="tt"><b>'+esc(nameOf(i))+'</b><small>'+fmtDate(i.sellDate)+(i.sellApp?' · '+esc(i.sellApp):'')+'</small></span>'+
+        '<span class="rt"><b>'+fmt(i.sellPrice)+'</b><span class="badge '+(pr<0?'loss':'sold')+'">'+fmtS(pr)+'</span></span></div>';
+    }).join('');
+    var b=x.sellCount
+      ?'<div class="stats">'+stat('Satış adedi',x.sellCount)+stat('Ciro',fmt(x.sellTotal))+stat('Maliyet',fmt(x.cost),'','Alış + masraf')+stat('Net kâr / zarar',fmtS(x.profit),cls(x.profit),'Ort. '+fmtS(x.avg))+'</div>'+
+        (px.sellCount?'<div class="delta">Önceki aya göre: <b class="'+cls(x.profit-px.profit)+'">'+fmtS(x.profit-px.profit)+'</b> ('+(x.sellCount-px.sellCount>=0?'+':'')+(x.sellCount-px.sellCount)+' satış)</div>':'')+
+        '<div style="margin-top:.4rem">'+list+'</div>'
+      :'<div class="empty" style="padding:1rem"><b>Bu ay satış yok</b>Satış ekledikçe burada görünür.</div>';
+    return acc('mo-'+m,head,b,'sub');
+  }).join('');
+  return acc('home-aylik',sec('Aylık satış takibi','<span class="badge '+(cur.profit<0?'loss':'sold')+'">Bu ay '+(cur.sellCount?fmtS(cur.profit):'—')+'</span>'),body);
+}
 function viewHome(){
   var s=summary('',''),stock=s.stock.slice().sort(cmp('buyDate'));
   var ev=[];
@@ -534,6 +568,7 @@ function viewHome(){
     '<div class="card hero"><div class="muted">Toplam net kâr / zarar</div><div class="v '+cls(s.profit)+'">'+fmtS(s.profit)+'</div>'+
     '<div class="s">'+s.buyCount+' alış · '+s.sellCount+' satış · '+s.stockCount+' stokta</div></div>'+
     '<div class="quick"><button class="btn primary" data-a="add-buy">Alış ekle</button><button class="btn" data-a="add-sale">Satış ekle</button></div>'+
+    monthlyHome()+
     acc('home-ozet',sec('Kısa özet'),'<div class="stats">'+
       stat('Alış tutarı',fmt(s.buyTotal))+stat('Satış tutarı',fmt(s.sellTotal))+
       stat('Stok tutarı',fmt(s.stockValue),'',s.stockCount+' ürün')+stat('Toplam masraf',fmt(sum(items,function(i){return i.expense})))+'</div>')+
@@ -669,7 +704,7 @@ function viewAyar(){
     '<button class="btn block" data-a="exp-xlsx">Excel (.xlsx) olarak dışa aktar</button>'+
     '<button class="btn block danger" data-a="wipe">Tüm verileri sil</button></div>'+
     '<p class="muted" style="font-size:.82rem;margin:.8rem 0 0">Veriler yalnızca bu cihazın tarayıcısında saklanır. Düzenli olarak JSON yedeği almanız önerilir. Şu an '+items.length+' kayıt var.</p>';
-  var h='<div class="about"><b>Alış Satış Takip</b><br>Oluşturan: <b>HAKAN KORKMAZ</b><br>Copyright © 2026 · Sürüm 1.3</div>';
+  var h='<div class="about"><b>Alış Satış Takip</b><br>Oluşturan: <b>HAKAN KORKMAZ</b><br>Copyright © 2026 · Sürüm 1.4</div>';
   view.innerHTML=acc('st-gorunum',sec('Görünüm'),g)+acc('st-veri',sec('Veri yönetimi'),d)+acc('st-hakkinda',sec('Hakkında'),h);
   view.style.cssText='';
   cur.refresh=null;
